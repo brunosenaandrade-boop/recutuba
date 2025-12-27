@@ -2,6 +2,145 @@
 
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0'
 
+// Credenciais centralizadas do operador (definidas no .env)
+export function getOperatorCredentials() {
+  return {
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+    accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  }
+}
+
+interface VerifyPhoneResult {
+  valid: boolean
+  whatsapp_id?: string
+  error?: string
+}
+
+// Verificar se o numero esta registrado no WhatsApp
+export async function verifyWhatsAppNumber(phone: string): Promise<VerifyPhoneResult> {
+  const { phoneNumberId, accessToken } = getOperatorCredentials()
+
+  if (!phoneNumberId || !accessToken) {
+    // Se nao tem credenciais, retorna como valido (nao pode verificar)
+    return { valid: true, error: 'Credenciais WhatsApp nao configuradas' }
+  }
+
+  const formattedPhone = formatPhoneNumber(phone)
+
+  // Primeiro valida o formato do numero brasileiro
+  if (!isValidBrazilianMobile(formattedPhone)) {
+    return { valid: false, error: 'Numero de celular brasileiro invalido' }
+  }
+
+  try {
+    // Usa o endpoint de mensagens com mensagem tipo "text" para verificar
+    // A Meta valida o contato antes de tentar enviar
+    // Usamos uma abordagem alternativa: verificar via API de contatos
+    const response = await fetch(
+      `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: formattedPhone,
+          type: 'text',
+          text: {
+            preview_url: false,
+            body: '✅ Seu numero foi verificado! Em breve entraremos em contato com informacoes sobre o RecuperaTuba.',
+          },
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      // Erro 131030 = numero nao registrado no WhatsApp
+      // Erro 131026 = numero invalido
+      const errorCode = data?.error?.code
+      if (errorCode === 131030 || errorCode === 131026) {
+        return { valid: false, error: 'Numero nao registrado no WhatsApp' }
+      }
+      // Outros erros - assumir que o problema e do lado da API
+      console.error('Erro ao verificar WhatsApp:', data)
+      return { valid: true, error: 'Erro ao verificar, numero aceito' }
+    }
+
+    // Mensagem enviada com sucesso = numero valido no WhatsApp
+    const whatsapp_id = data.contacts?.[0]?.wa_id
+    return { valid: true, whatsapp_id }
+  } catch (error) {
+    console.error('Erro na verificacao WhatsApp:', error)
+    // Em caso de erro de rede, aceita o numero
+    return { valid: true, error: 'Erro de conexao, numero aceito' }
+  }
+}
+
+// Validar formato de celular brasileiro
+export function isValidBrazilianMobile(phone: string): boolean {
+  // Remove 55 do inicio se tiver
+  let numero = phone.replace(/^55/, '')
+
+  // Deve ter 10 ou 11 digitos (DDD + numero)
+  if (numero.length < 10 || numero.length > 11) {
+    return false
+  }
+
+  // DDD valido (11-99)
+  const ddd = parseInt(numero.substring(0, 2))
+  if (ddd < 11 || ddd > 99) {
+    return false
+  }
+
+  // DDDs validos no Brasil
+  const dddsValidos = [
+    11, 12, 13, 14, 15, 16, 17, 18, 19, // SP
+    21, 22, 24, // RJ
+    27, 28, // ES
+    31, 32, 33, 34, 35, 37, 38, // MG
+    41, 42, 43, 44, 45, 46, // PR
+    47, 48, 49, // SC
+    51, 53, 54, 55, // RS
+    61, // DF
+    62, 64, // GO
+    63, // TO
+    65, 66, // MT
+    67, // MS
+    68, // AC
+    69, // RO
+    71, 73, 74, 75, 77, // BA
+    79, // SE
+    81, 87, // PE
+    82, // AL
+    83, // PB
+    84, // RN
+    85, 88, // CE
+    86, 89, // PI
+    91, 93, 94, // PA
+    92, 97, // AM
+    95, // RR
+    96, // AP
+    98, 99, // MA
+  ]
+
+  if (!dddsValidos.includes(ddd)) {
+    return false
+  }
+
+  // Celular deve comecar com 9 (apos o DDD)
+  const primeiroDigito = numero.substring(2, 3)
+  if (primeiroDigito !== '9') {
+    return false
+  }
+
+  return true
+}
+
 interface SendMessageOptions {
   phoneNumberId: string
   accessToken: string

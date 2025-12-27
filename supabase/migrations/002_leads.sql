@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS leads (
   nome TEXT,
   email TEXT NOT NULL,
   whatsapp TEXT NOT NULL,
+  whatsapp_verificado BOOLEAN DEFAULT false,
+  whatsapp_id TEXT,
   nome_loja TEXT,
   origem TEXT DEFAULT 'landing_page',
   utm_source TEXT,
@@ -16,6 +18,10 @@ CREATE TABLE IF NOT EXISTS leads (
   convertido_em TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Se a tabela ja existe, adicionar as novas colunas
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS whatsapp_verificado BOOLEAN DEFAULT false;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS whatsapp_id TEXT;
 
 -- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);

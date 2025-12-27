@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
 
     const body = await request.json()
-    const { nome, email, whatsapp, nome_loja, utm_source, utm_medium, utm_campaign } = body
+    const { nome, email, whatsapp, nome_loja, utm_source, utm_medium, utm_campaign, whatsapp_verificado, whatsapp_id } = body
 
     // Validar campos obrigatorios
     if (!email || !whatsapp) {
@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
         nome: nome || null,
         email,
         whatsapp: whatsappLimpo,
+        whatsapp_verificado: whatsapp_verificado || false,
+        whatsapp_id: whatsapp_id || null,
         nome_loja: nome_loja || null,
         utm_source: utm_source || null,
         utm_medium: utm_medium || null,
