@@ -41,10 +41,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Rotas públicas
-  const publicRoutes = ['/login', '/register', '/api/webhooks']
+  // Rotas públicas (landing page, login, register, webhooks)
+  const publicRoutes = ['/', '/login', '/register', '/api/webhooks']
   const isPublicRoute = publicRoutes.some(route =>
-    request.nextUrl.pathname.startsWith(route)
+    request.nextUrl.pathname === route ||
+    (route !== '/' && request.nextUrl.pathname.startsWith(route))
   )
 
   // Se não está logado e não é rota pública, redireciona para login
